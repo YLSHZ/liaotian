@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>局域网聊天</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(180deg, #1d2b64 0%, #f8cdda 100%);
+            color: #222;
+        }
+        .page {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 24px;
+        }
+        .card {
+            background: rgba(255,255,255,0.95);
+            border-radius: 18px;
+            padding: 24px;
+            box-shadow: 0 16px 40px rgba(0,0,0,0.18);
+        }
+        h1 {
+            margin-top: 0;
+            font-size: 2rem;
+            text-align: center;
+        }
+        .hint {
+            margin: 0 auto 18px;
+            max-width: 720px;
+            text-align: center;
+            color: #555;
+            line-height: 1.6;
+        }
+        .chat-box {
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+        .messages {
+            background: #f4f7ff;
+            border: 1px solid #d3d8ff;
+            border-radius: 14px;
+            min-height: 360px;
+            max-height: 60vh;
+            overflow: auto;
+            padding: 16px;
+        }
+        .message {
+            margin-bottom: 14px;
+            padding: 12px 14px;
+            border-radius: 12px;
+            background: white;
+            border: 1px solid #e3e9ff;
+        }
+        .message:last-child {
+            margin-bottom: 0;
+        }
+        .message .name {
+            font-weight: 700;
+            color: #1d2b64;
+            margin-bottom: 6px;
+        }
+        .message .text {
+            white-space: pre-wrap;
+            word-break: break-word;
+            color: #333;
+        }
+        .message .time {
+            margin-top: 8px;
+            font-size: 0.84rem;
+            color: #777;
+        }
+        .input-group {
+            display: grid;
+            gap: 12px;
+        }
+        textarea,
+        input[type="text"] {
+            width: 100%;
+            border-radius: 12px;
+            border: 1px solid #cbd2f0;
+            padding: 14px 16px;
+            font-size: 1rem;
+            resize: vertical;
+            outline: none;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+        textarea:focus,
+        input[type="text"]:focus {
+            border-color: #5d7bff;
+            box-shadow: 0 0 0 4px rgba(93,123,255,0.14);
+        }
+        button {
+            width: 100%;
+            max-width: 220px;
+            margin-left: auto;
+            border: none;
+            border-radius: 999px;
+            color: white;
+            background: #3751ff;
+            cursor: pointer;
+            padding: 14px 18px;
+            font-size: 1rem;
+            font-weight: 700;
+        }
+        button:disabled {
+            opacity: 0.55;
+            cursor: not-allowed;
+        }
+        .admin-bar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 18px;
+        }
+        .admin-bar input[type="password"] {
+            width: 100%;
+            max-width: 280px;
+        }
+        .icon-button {
+            width: 46px;
+            height: 46px;
+            border-radius: 50%;
+            background: #3751ff;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.1rem;
+            border: none;
+            color: white;
+            cursor: pointer;
+            text-decoration: none;
+        }
+        .icon-button.hidden {
+            display: none;
+        }
+        .message-actions {
+            margin-top: 10px;
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+        .message-revoke {
+            border: 1px solid #d33;
+            background: #ff4d4f;
+            border-radius: 999px;
+            color: #fff;
+            padding: 6px 10px;
+            font-size: 0.85rem;
+            cursor: pointer;
+        }
+        .modal.hidden {
+            display: none;
+        }
+        .admin-panel {
+            display: grid;
+            gap: 12px;
+            text-align: left;
+        }
+        .admin-panel label {
+            font-weight: 600;
+            color: #333;
+        }
+        .admin-panel input[type="text"] {
+            width: 100%;
+            border-radius: 12px;
+            border: 1px solid #cbd2f0;
+            padding: 12px 14px;
+            font-size: 1rem;
+            outline: none;
+        }
+        .admin-panel button {
+            max-width: 100%;
+            margin-left: 0;
+        }
+        .status {
+            color: #555;
+            font-size: 0.95rem;
+        }
+        .link-row {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 12px;
+            margin-top: 12px;
+        }
+        .link-row a {
+            color: #3751ff;
+            text-decoration: none;
+            font-weight: 600;
+        }
+        .modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+        }
+        .modal-content {
+            width: 100%;
+            max-width: 420px;
+            background: white;
+            border-radius: 20px;
+            padding: 24px;
+            text-align: center;
+            box-shadow: 0 24px 60px rgba(0,0,0,0.18);
+        }
+        .modal-content h2 {
+            margin-top: 0;
+            font-size: 1.45rem;
+            color: #1d2b64;
+        }
+    </style>
+</head>
+<body>
+    <div class="page">
+        <div class="card">
+            <h1>局域网即时聊天</h1>
+            <p class="hint">请先输入昵称，然后在下面输入聊天内容。局域网内同一 Wi-Fi 下的手机或电脑访问本机 IP 的 <code>/chat.html</code> 页面即可加入聊天。</p>
+            <div class="admin-bar">
+                <input type="password" id="admin-password" placeholder="管理员密码" aria-label="管理员密码" />
+                <button id="admin-login-button" type="button">管理员登录</button>
+                <span id="admin-label">未登录</span>
+                <button id="admin-settings-button" class="icon-button hidden" aria-label="管理员设置">⚙</button>
+            </div>
+            <div class="chat-box">
+                <div class="messages" id="messages"></div>
+                <div class="input-group">
+                    <textarea id="message-input" rows="4" placeholder="在这里输入消息，按 Ctrl+Enter 发送" aria-label="输入消息"></textarea>
+                    <button id="send-button" type="button">发送消息</button>
+                    <div class="status" id="status">正在连接聊天服务器...</div>
+                </div>
+            </div>
+            <div class="link-row">
+                <a href="index.html">返回文件下载首页</a>
+            </div>
+            <div class="modal hidden" id="admin-modal">
+                <div class="modal-content">
+                    <h2>管理员设置</h2>
+                    <div class="admin-panel">
+                        <label for="mute-name-input">禁言用户</label>
+                        <input type="text" id="mute-name-input" placeholder="输入要禁言的昵称" aria-label="禁言用户昵称" />
+                        <button id="mute-button" type="button">禁言该用户</button>
+                        <label for="unmute-name-input">解除禁言</label>
+                        <input type="text" id="unmute-name-input" placeholder="输入要解除禁言的昵称" aria-label="解除禁言昵称" />
+                        <button id="unmute-button" type="button">解除禁言</button>
+                        <button id="clear-chat-button" type="button">清空聊天记录</button>
+                        <div class="status" id="admin-action-status">管理员模式已启用。</div>
+                        <button id="admin-close-button" type="button">关闭</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="modal" id="name-modal">
+        <div class="modal-content">
+            <h2>欢迎加入聊天</h2>
+            <p>请输入你的昵称，昵称会保存在本机浏览器中。</p>
+            <input type="text" id="name-input" placeholder="你的昵称" aria-label="昵称" />
+            <button id="name-submit" type="button">进入聊天室</button>
+        </div>
+    </div>
+    <script>
+        const messagesEl = document.getElementById('messages');
+        const statusEl = document.getElementById('status');
+        const sendButton = document.getElementById('send-button');
+        const messageInput = document.getElementById('message-input');
+        const nameModal = document.getElementById('name-modal');
+        const nameInput = document.getElementById('name-input');
+        const nameSubmit = document.getElementById('name-submit');
+        const adminPasswordInput = document.getElementById('admin-password');
+        const adminLoginButton = document.getElementById('admin-login-button');
+        const adminLabel = document.getElementById('admin-label');
+        const adminSettingsButton = document.getElementById('admin-settings-button');
+        const adminModal = document.getElementById('admin-modal');
+        const muteNameInput = document.getElementById('mute-name-input');
+        const unmuteNameInput = document.getElementById('unmute-name-input');
+        const muteButton = document.getElementById('mute-button');
+        const unmuteButton = document.getElementById('unmute-button');
+        const clearChatButton = document.getElementById('clear-chat-button');
+        const adminActionStatus = document.getElementById('admin-action-status');
+        const adminCloseButton = document.getElementById('admin-close-button');
+
+        let userName = localStorage.getItem('chat_username') || '';
+        let isAdmin = false;
+        let adminPassword = '';
+        let pollingTimer = null;
+        let isSending = false;
+
+        function escapeHtml(text) {
+            return text.replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        function formatTime(ts) {
+            const date = new Date(ts);
+            return date.toLocaleTimeString('zh-CN', { hour12: false });
+        }
+
+        function updateAdminDisplay() {
+            adminSettingsButton.classList.toggle('hidden', !isAdmin);
+            adminLabel.textContent = isAdmin ? '管理员身份已启用' : '未登录';
+            adminPasswordInput.value = '';
+        }
+
+        function renderMessages(items) {
+            messagesEl.innerHTML = items.map(item => {
+                const revokeButton = isAdmin ? `<button class="message-revoke" data-id="${escapeHtml(item.id)}">撤回</button>` : '';
+                return `
+                <div class="message" data-id="${escapeHtml(item.id)}">
+                    <div class="name">${escapeHtml(item.name)}</div>
+                    <div class="text">${escapeHtml(item.text)}</div>
+                    <div class="message-actions">
+                        ${revokeButton}
+                        <div class="time">${formatTime(item.timestamp)}</div>
+                    </div>
+                </div>
+            `;
+            }).join('');
+            if (items.length) {
+                messagesEl.lastElementChild?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+            }
+        }
+
+        async function fetchMessages() {
+            try {
+                const res = await fetch('/chat/messages');
+                if (!res.ok) throw new Error('无法获取消息');
+                const data = await res.json();
+                renderMessages(data);
+                statusEl.textContent = '聊天已连接，消息会自动刷新。';
+            } catch (err) {
+                statusEl.textContent = '无法连接到聊天服务器，请刷新页面。';
+                console.error(err);
+            }
+        }
+
+        async function sendMessage() {
+            const text = messageInput.value.trim();
+            if (!text) return;
+            if (!userName) {
+                statusEl.textContent = '请先设置昵称。';
+                return;
+            }
+            if (isSending) return;
+            isSending = true;
+            sendButton.disabled = true;
+            statusEl.textContent = '发送中...';
+            try {
+                const res = await fetch('/chat/send', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: userName, text })
+                });
+                const data = await res.json();
+                if (!res.ok) {
+                    throw new Error(data.error || '发送失败');
+                }
+                messageInput.value = '';
+                await fetchMessages();
+                statusEl.textContent = '发送成功。';
+            } catch (err) {
+                statusEl.textContent = err.message || '发送失败，请检查服务器状态。';
+                console.error(err);
+            } finally {
+                isSending = false;
+                sendButton.disabled = false;
+            }
+        }
+
+        async function adminRequest(action, payload) {
+            if (!adminPassword) {
+                adminActionStatus.textContent = '请先输入管理员密码登录。';
+                return null;
+            }
+            try {
+                const res = await fetch('/chat/admin/action', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password: adminPassword, action, ...payload })
+                });
+                const data = await res.json();
+                if (!res.ok) {
+                    throw new Error(data.error || '操作失败');
+                }
+                adminActionStatus.textContent = data.message || '操作成功';
+                return data;
+            } catch (err) {
+                adminActionStatus.textContent = err.message || '管理员操作失败';
+                console.error(err);
+                return null;
+            }
+        }
+
+        async function attemptAdminLogin() {
+            const password = adminPasswordInput.value.trim();
+            if (!password) {
+                adminLabel.textContent = '请输入管理员密码';
+                return;
+            }
+            try {
+                const res = await fetch('/chat/admin/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password })
+                });
+                const data = await res.json();
+                if (!res.ok) {
+                    throw new Error(data.error || '管理员登录失败');
+                }
+                isAdmin = true;
+                adminPassword = password;
+                updateAdminDisplay();
+                adminActionStatus.textContent = '管理员已登录，设置图标已显示。';
+            } catch (err) {
+                isAdmin = false;
+                adminPassword = '';
+                updateAdminDisplay();
+                adminLabel.textContent = err.message || '管理员密码错误';
+                console.error(err);
+            }
+        }
+
+        function openAdminModal() {
+            adminModal.classList.remove('hidden');
+            adminActionStatus.textContent = '可以执行管理员操作。';
+        }
+
+        function closeAdminModal() {
+            adminModal.classList.add('hidden');
+        }
+
+        async function revokeMessage(messageId) {
+            await adminRequest('revoke', { messageId });
+            await fetchMessages();
+        }
+
+        adminSettingsButton.addEventListener('click', openAdminModal);
+        adminLoginButton.addEventListener('click', attemptAdminLogin);
+        adminCloseButton.addEventListener('click', closeAdminModal);
+        muteButton.addEventListener('click', async () => {
+            const target = muteNameInput.value.trim();
+            if (!target) {
+                adminActionStatus.textContent = '请输入要禁言的昵称。';
+                return;
+            }
+            await adminRequest('mute', { target });
+        });
+        unmuteButton.addEventListener('click', async () => {
+            const target = unmuteNameInput.value.trim();
+            if (!target) {
+                adminActionStatus.textContent = '请输入要解除禁言的昵称。';
+                return;
+            }
+            await adminRequest('unmute', { target });
+        });
+        clearChatButton.addEventListener('click', async () => {
+            if (!confirm('确认清空所有聊天记录吗？')) return;
+            await adminRequest('clear', {});
+            await fetchMessages();
+        });
+
+        messagesEl.addEventListener('click', event => {
+            const revokeButton = event.target.closest('.message-revoke');
+            if (revokeButton && isAdmin) {
+                const messageId = revokeButton.dataset.id;
+                revokeMessage(messageId);
+            }
+        });
+
+        function openNameModal() {
+            nameModal.style.display = 'flex';
+            nameInput.value = userName;
+            nameInput.focus();
+        }
+
+        function closeNameModal() {
+            nameModal.style.display = 'none';
+        }
+
+        nameSubmit.addEventListener('click', () => {
+            const name = nameInput.value.trim();
+            if (!name) {
+                nameInput.focus();
+                return;
+            }
+            userName = name;
+            localStorage.setItem('chat_username', userName);
+            closeNameModal();
+            fetchMessages();
+        });
+
+        messageInput.addEventListener('keydown', event => {
+            if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
+                event.preventDefault();
+                sendMessage();
+            }
+        });
+
+        sendButton.addEventListener('click', sendMessage);
+
+        if (!userName) {
+            openNameModal();
+        } else {
+            closeNameModal();
+            fetchMessages();
+        }
+
+        updateAdminDisplay();
+        pollingTimer = setInterval(fetchMessages, 2500);
+    </script>
+</body>
+</html>
