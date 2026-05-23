@@ -38,6 +38,7 @@ if not defined LAN_IP (
 if defined LAN_IP (
     echo 本机局域网地址: !LAN_IP!
     echo 手机访问: http://!LAN_IP!:8000/chat.html
+    echo 发现页面: http://!LAN_IP!:8000/discover.html
 ) else (
     echo 未能自动获取局域网地址，请手动使用 ipconfig 查找 IPv4 地址
 )

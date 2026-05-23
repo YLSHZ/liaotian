@@ -148,6 +148,7 @@
             display: flex;
             justify-content: flex-end;
             gap: 10px;
+            flex-wrap: wrap;
         }
         .message-revoke {
             border: 1px solid #d33;
@@ -165,6 +166,25 @@
             display: grid;
             gap: 12px;
             text-align: left;
+        }
+        .muted-list {
+            background: #f7f8ff;
+            border: 1px solid #d3d8ff;
+            border-radius: 12px;
+            padding: 12px;
+            min-height: 60px;
+            white-space: pre-wrap;
+            color: #333;
+            font-size: 0.95rem;
+        }
+        .admin-row {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 10px;
+            align-items: center;
+        }
+        .admin-row button {
+            max-width: 180px;
         }
         .admin-panel label {
             font-weight: 600;
@@ -231,6 +251,7 @@
             <div class="admin-bar">
                 <input type="password" id="admin-password" placeholder="管理员密码" aria-label="管理员密码" />
                 <button id="admin-login-button" type="button">管理员登录</button>
+                <a class="icon-button" href="/discover.html" aria-label="查找局域网聊天室">🔎</a>
                 <span id="admin-label">未登录</span>
                 <button id="admin-settings-button" class="icon-button hidden" aria-label="管理员设置">⚙</button>
             </div>
@@ -255,6 +276,16 @@
                         <label for="unmute-name-input">解除禁言</label>
                         <input type="text" id="unmute-name-input" placeholder="输入要解除禁言的昵称" aria-label="解除禁言昵称" />
                         <button id="unmute-button" type="button">解除禁言</button>
+                        <div class="admin-row">
+                            <button id="mute-all-button" type="button">全员禁言</button>
+                            <button id="unmute-all-button" type="button">解除全员禁言</button>
+                        </div>
+                        <label for="delete-user-input">删除指定用户所有消息</label>
+                        <input type="text" id="delete-user-input" placeholder="输入要删除消息的昵称" aria-label="删除用户昵称" />
+                        <button id="delete-user-button" type="button">删除该用户消息</button>
+                        <label>当前禁言名单</label>
+                        <div class="muted-list" id="muted-list">暂无禁言用户。</div>
+                        <button id="refresh-muted-list-button" type="button">刷新禁言名单</button>
                         <button id="clear-chat-button" type="button">清空聊天记录</button>
                         <div class="status" id="admin-action-status">管理员模式已启用。</div>
                         <button id="admin-close-button" type="button">关闭</button>
@@ -286,8 +317,14 @@
         const adminModal = document.getElementById('admin-modal');
         const muteNameInput = document.getElementById('mute-name-input');
         const unmuteNameInput = document.getElementById('unmute-name-input');
+        const deleteUserInput = document.getElementById('delete-user-input');
         const muteButton = document.getElementById('mute-button');
         const unmuteButton = document.getElementById('unmute-button');
+        const muteAllButton = document.getElementById('mute-all-button');
+        const unmuteAllButton = document.getElementById('unmute-all-button');
+        const deleteUserButton = document.getElementById('delete-user-button');
+        const mutedListEl = document.getElementById('muted-list');
+        const refreshMutedListButton = document.getElementById('refresh-muted-list-button');
         const clearChatButton = document.getElementById('clear-chat-button');
         const adminActionStatus = document.getElementById('admin-action-status');
         const adminCloseButton = document.getElementById('admin-close-button');
@@ -364,7 +401,7 @@
                 const res = await fetch('/chat/send', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ name: userName, text })
+                    body: JSON.stringify({ name: userName, text, adminPassword: isAdmin ? adminPassword : '' })
                 });
                 const data = await res.json();
                 if (!res.ok) {
@@ -403,6 +440,17 @@
                 adminActionStatus.textContent = err.message || '管理员操作失败';
                 console.error(err);
                 return null;
+            }
+        }
+
+        async function refreshMutedList() {
+            const result = await adminRequest('list_muted', {});
+            if (result && Array.isArray(result.muted)) {
+                if (result.muted.length === 0) {
+                    mutedListEl.textContent = '暂无禁言用户。';
+                } else {
+                    mutedListEl.textContent = result.muted.join('\n');
+                }
             }
         }
 
@@ -459,6 +507,7 @@
                 return;
             }
             await adminRequest('mute', { target });
+            await refreshMutedList();
         });
         unmuteButton.addEventListener('click', async () => {
             const target = unmuteNameInput.value.trim();
@@ -467,7 +516,26 @@
                 return;
             }
             await adminRequest('unmute', { target });
+            await refreshMutedList();
         });
+        muteAllButton.addEventListener('click', async () => {
+            await adminRequest('mute_all', {});
+        });
+        unmuteAllButton.addEventListener('click', async () => {
+            await adminRequest('unmute_all', {});
+            await refreshMutedList();
+        });
+        deleteUserButton.addEventListener('click', async () => {
+            const target = deleteUserInput.value.trim();
+            if (!target) {
+                adminActionStatus.textContent = '请输入要删除消息的昵称。';
+                return;
+            }
+            if (!confirm(`确定删除 ${target} 的所有消息吗？`)) return;
+            await adminRequest('delete_user', { target });
+            await fetchMessages();
+        });
+        refreshMutedListButton.addEventListener('click', refreshMutedList);
         clearChatButton.addEventListener('click', async () => {
             if (!confirm('确认清空所有聊天记录吗？')) return;
             await adminRequest('clear', {});
@@ -522,6 +590,7 @@
 
         updateAdminDisplay();
         pollingTimer = setInterval(fetchMessages, 2500);
+        refreshMutedList();
     </script>
 </body>
 </html>

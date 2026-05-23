@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>局域网聊天室发现</title>
+    <style>
+        body {
+            margin: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #eef2ff;
+            color: #222;
+        }
+        .page {
+            max-width: 920px;
+            margin: 0 auto;
+            padding: 24px;
+        }
+        .card {
+            background: #fff;
+            border-radius: 20px;
+            padding: 24px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.08);
+        }
+        h1 {
+            margin-top: 0;
+            font-size: 2rem;
+            text-align: center;
+        }
+        .hint {
+            text-align: center;
+            color: #555;
+            margin-bottom: 20px;
+            line-height: 1.6;
+        }
+        .server-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            display: grid;
+            gap: 14px;
+        }
+        .server-card {
+            border: 1px solid #d9e2ff;
+            border-radius: 16px;
+            padding: 18px;
+            background: #f8f9ff;
+            display: grid;
+            gap: 10px;
+        }
+        .server-card h2 {
+            margin: 0;
+            font-size: 1.1rem;
+            color: #1d2b64;
+        }
+        .server-card p {
+            margin: 0;
+            color: #444;
+        }
+        .server-card a,
+        .join-button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            background: #3751ff;
+            border-radius: 999px;
+            padding: 12px 18px;
+            text-decoration: none;
+            width: fit-content;
+            border: none;
+            cursor: pointer;
+        }
+        .refresh-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-bottom: 18px;
+        }
+        button {
+            border: none;
+            border-radius: 999px;
+            background: #3751ff;
+            color: white;
+            padding: 12px 18px;
+            font-size: 1rem;
+            cursor: pointer;
+        }
+        .status {
+            color: #555;
+        }
+    </style>
+</head>
+<body>
+    <div class="page">
+        <div class="card">
+            <h1>局域网聊天室发现</h1>
+            <p class="hint">本页面会显示当前局域网内发现的其他聊天服务器。点击“进入聊天”即可打开对应服务器。</p>
+            <div class="refresh-row">
+                <button id="refresh-button" type="button">刷新列表</button>
+                <button id="scan-button" type="button">主动扫描</button>
+                <div class="status" id="status">正在加载...</div>
+            </div>
+            <div class="recent-section" id="recent-section">
+                <h2>最近加入</h2>
+                <ul class="server-list" id="recent-list"></ul>
+            </div>
+            <ul class="server-list" id="server-list"></ul>
+        </div>
+    </div>
+    <script>
+        const listEl = document.getElementById('server-list');
+        const recentListEl = document.getElementById('recent-list');
+        const statusEl = document.getElementById('status');
+        const refreshButton = document.getElementById('refresh-button');
+
+        function formatServer(server) {
+            const label = `${server.name}`;
+            const url = `http://${server.ip}:${server.port}${server.path}`;
+            const source = server.source ? `来源：${server.source}` : '';
+            return `
+                <li class="server-card">
+                    <h2>${label}</h2>
+                    <p>地址：${server.ip}:${server.port}</p>
+                    <p>页面：${server.path}</p>
+                    <p>${source}</p>
+                    <button class="join-button" data-name="${escapeHtml(label)}" data-url="${escapeHtml(url)}">进入聊天</button>
+                </li>
+            `;
+        }
+
+        function escapeHtml(text) {
+            return text.replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        function saveRecentServer(name, url) {
+            const list = JSON.parse(localStorage.getItem('chat_recent_servers') || '[]');
+            const now = Date.now();
+            const filtered = list.filter(item => item.url !== url);
+            filtered.unshift({ name, url, last: now });
+            localStorage.setItem('chat_recent_servers', JSON.stringify(filtered.slice(0, 5)));
+        }
+
+        function renderRecentServers() {
+            const list = JSON.parse(localStorage.getItem('chat_recent_servers') || '[]');
+            if (!list.length) {
+                recentListEl.innerHTML = '<li class="server-card"><p>暂无最近访问的服务器。</p></li>';
+                return;
+            }
+            recentListEl.innerHTML = list.map(item => `
+                <li class="server-card">
+                    <h2>${escapeHtml(item.name)}</h2>
+                    <p>地址：${escapeHtml(item.url)}</p>
+                    <button class="join-button" data-name="${escapeHtml(item.name)}" data-url="${escapeHtml(item.url)}">重新进入</button>
+                </li>
+            `).join('');
+        }
+
+        async function loadServers(scan = false) {
+            statusEl.textContent = scan ? '正在主动扫描本地网络，请稍候...' : '正在搜索局域网服务器...';
+            try {
+                const url = scan ? '/chat/discover?scan=1' : '/chat/discover';
+                const res = await fetch(url);
+                if (!res.ok) throw new Error('无法获取发现结果');
+                const servers = await res.json();
+                if (servers.length === 0) {
+                    listEl.innerHTML = '<li class="server-card"><p>当前未发现任何聊天服务器。</p></li>';
+                } else {
+                    listEl.innerHTML = servers.map(formatServer).join('');
+                }
+                statusEl.textContent = `已发现 ${servers.length} 个服务器`;
+            } catch (err) {
+                listEl.innerHTML = '<li class="server-card"><p>发现失败，请确认本机已启动服务器并允许 UDP 广播。</p></li>';
+                statusEl.textContent = '发现失败';
+                console.error(err);
+            }
+        }
+
+        const scanButton = document.getElementById('scan-button');
+        refreshButton.addEventListener('click', () => loadServers(false));
+        scanButton.addEventListener('click', () => loadServers(true));
+        listEl.addEventListener('click', event => {
+            const button = event.target.closest('.join-button');
+            if (!button) return;
+            const name = button.dataset.name || '聊天室';
+            const url = button.dataset.url;
+            if (url) {
+                saveRecentServer(name, url);
+                window.open(url, '_blank');
+            }
+        });
+        recentListEl.addEventListener('click', event => {
+            const button = event.target.closest('.join-button');
+            if (!button) return;
+            const name = button.dataset.name || '聊天室';
+            const url = button.dataset.url;
+            if (url) {
+                saveRecentServer(name, url);
+                window.open(url, '_blank');
+            }
+        });
+        renderRecentServers();
+        loadServers();
+    </script>
+</body>
+</html>
